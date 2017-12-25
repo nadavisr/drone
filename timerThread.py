@@ -12,7 +12,11 @@ class Timer(Thread):
     def run(self):
         while not self.stopped.wait(self.interval):
             self.channels.stopListen = True
-            time.sleep(0.01)
 
+            if self.stopped.is_set():
+                print('timer thread exiting...')
+                return
+
+            time.sleep(0.01)
             thread = Thread(target=self.function)
             thread.start()

@@ -16,8 +16,10 @@ import socket
 import time
 import timerThread
 import channels
-from threading import Event
+from threading import Event, Thread
 import sys, select
+import cv2
+from subprocess import *
 
 
 DRONE_IP = '172.16.10.1'
@@ -93,40 +95,72 @@ def closeComm():
     channels.udpSocket.close()
 
 def resetComm():
+
     print('enter resetCom')
     closeComm()
     time.sleep(0.05)
     initComm()
     sendAllPackets()
     channels.stopListen = False
+    #time.sleep(0.05)
     startListen(channels.tcpSocketVideo2)
+
 
 def startListen(tcpSocket):
     try:
-        print('enter startLisen')
+
+        count = 0
+        print('enter startLisen\n')
         while (not channels.stopListen):
+            count = count +1
             msg = tcpSocket.recv(65000)
-            print('received {} - {}'.format(len(msg), msg))
-    except:
-        print("startListen error", sys.exc_info()[0])
+            if(count >= 20):
+                end = '\n'
+                count = 0
+            else:
+                end = ', '
+
+            print(len(msg), sep=', ', end=end, file=sys.stdout)
+
+            if len(msg) == 40:
+                #print(msg)
+                continue
+
+            process.stdin.write(msg)
+            #f.write(msg)
+    except Exception as e:
+        print("startListen error", e)
 
     print('exiting startListen')
+    f.close()
+
+def userListener():
+    input("Press Enter to exit...\n")
+    print('Enter pressed ')
+    channels.stopListen = True
+    stopFlag.set()
 
 if __name__ == '__main__':
-    f = open()
+    f = open('./video.avi', 'wb')
     channels = channels.Channels()
     initComm()
     sendAllPackets()
     stopFlag = Event()
-    timer = timerThread.Timer(stopFlag,resetComm, channels, 30)
+    cmd = ['ffplay','-i', '-']
+    process = Popen(cmd, stdin=PIPE)
+    timer = timerThread.Timer(stopFlag,resetComm, channels, 10)
     timer.start()
+    stopThread = Thread(target=userListener).start()
+
     startListen(channels.tcpSocketVideo2)
 
     timer.join()
-
+    process.kill()
+    f.close()
+    closeComm()
     print('finished')
     # this will stop the timer
-    stopFlag.set()
-    closeComm()
+
+
 
 
