@@ -6,3 +6,5 @@ class Channels():
         self.tcpSocketVideo1 = socket.socket
         self.tcpSocketVideo2 = socket.socket
         self.stopListen = False
+        self.isSync = False
+        self.isStarted = False

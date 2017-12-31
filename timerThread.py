@@ -10,8 +10,15 @@ class Timer(Thread):
         self.channels = channels
 
     def run(self):
-        while not self.stopped.wait(self.interval):
+        #first time no delay
+        if(not self.channels.isStarted):
+            self.channels.isStarted = True
+            thread = Thread(target=self.function)
+            thread.start()
+
+        while (not self.stopped.wait(self.interval)):
             self.channels.stopListen = True
+            self.channels.isStarted = True
 
             if self.stopped.is_set():
                 print('timer thread exiting...')

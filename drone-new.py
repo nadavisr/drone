@@ -1,16 +1,3 @@
-# import socket
-#    4
-#    5
-#    6 TCP_IP = '127.0.0.1'
-#    7 TCP_PORT = 5005
-#    8 BUFFER_SIZE = 1024
-#    9 MESSAGE = "Hello, World!"
-#   10
-#   11 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-#   12 s.connect((TCP_IP, TCP_PORT))
-#   13 s.send(MESSAGE)
-#   14 data = s.recv(BUFFER_SIZE)
-#   15 s.close()
 
 import socket
 import time
@@ -21,7 +8,8 @@ import sys, select
 import cv2
 from subprocess import *
 import numpy as np
-#import pylab as plt
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
 
 
 DRONE_IP = '172.16.10.1'
@@ -30,6 +18,7 @@ UDP_PORT = 8895
 BUFFER_SIZE = 8192
 WIDTH = 720
 HEIGHT = 576
+global im1
 
 magicBytesCtrl = bytes([
 		0x49, 0x54, 0x64, 0x00, 0x00, 0x00, 0x5D, 0x00, 0x00, 0x00, 0x81, 0x85, 0xFF, 0xBD, 0x2A, 0x29, 0x5C, 0xAD, 0x67, 0x82, 0x5C, 0x57, 0xBE, 0x41, 0x03, 0xF8, 0xCA, 0xE2, 0x64, 0x30, 0xA3, 0xC1,
@@ -106,21 +95,21 @@ def resetComm():
     initComm()
     sendAllPackets()
     channels.stopListen = False
-    #time.sleep(0.05)
     startListen(channels.tcpSocketVideo2)
 
 
 def startListen(tcpSocket):
+    global process
     try:
+        while (process is None):
+            time.sleep(0.5)
+            continue
 
         count = 0
         print('enter startLisen\n')
         while (not channels.stopListen):
-            bytes = f.read(1000)
-            process.stdin.write(bytes)
-            continue
             count = count +1
-            #msg = tcpSocket.recv(65000)
+            msg = tcpSocket.recv(65000)
             if(count >= 20):
                 end = '\n'
                 count = 0
@@ -130,44 +119,16 @@ def startListen(tcpSocket):
             print(len(msg), sep=', ', end=end, file=sys.stdout)
 
             if len(msg) == 40:
-                channels.isSync = True
-                continue
-
-            if not channels.isSync:
+                #print(msg)
                 continue
 
             process.stdin.write(msg)
-            f.write(msg)
+            #f.write(msg)
     except Exception as e:
         print("startListen error", e)
-        channels.isSync=False
 
     print('exiting startListen')
-    channels.isSync = False
-    f.close()
-
-def displayImg():
-    while(not stopFlag.isSet()):
-        try:
-            print('before displayImg read ')
-            rawImg = process.stdout.read(100)
-            print('-----stdout byts------: ', rawImg)
-            process.stdout.flush()
-            return
-            if len(rawImg) != WIDTH*HEIGHT*3:
-                continue
-
-            img = np.fromstring(rawImg, dtype='uint8')
-            img = img.reshape((HEIGHT, WIDTH,3))
-
-
-            mat = cv2.Mat(img)
-            cv2.imshow('drone', mat)
-            cv2.waitKey(0.01)
-
-        except Exception as e:
-            print("displayImg error", e)
-
+    #f.close()
 
 def userListener():
     input("Press Enter to exit...\n")
@@ -175,39 +136,56 @@ def userListener():
     channels.stopListen = True
     stopFlag.set()
 
+def displayImg(i):
+    print('===in displayImg===')
+    global im1
+    global ax1
+
+    if not stopFlag.isSet():
+
+        bytes = process.stdout.read(WIDTH * HEIGHT * 3)
+        process.stdout.flush()
+        print('---------read {} bytes from stdin'.format(len(bytes)))
+        if (len(bytes) == 0):
+            return
+
+        # process.stdout.flush()
+        img = np.fromstring(bytes, dtype='uint8')
+        img = img.reshape((HEIGHT, WIDTH, 3))
+
+        if im1 is None:
+            im1 = ax1.imshow(img)
+        else:
+            im1.set_data(img)
+
+
 if __name__ == '__main__':
-    f = open('./video.avi', 'rb')
+    #f = open('./video.avi', 'wb')
+    im1 = None
     channels = channels.Channels()
     initComm()
     sendAllPackets()
     stopFlag = Event()
-    cv2.namedWindow('drone')
-
     cmd = ['ffmpeg',
-           '-vcodec', 'h264',
-           '-f', 'image2pipe'
-           '-s', '{}x{}'.format(WIDTH,HEIGHT),
-           '-pix_fmt', 'yuv420p',
            '-i', '-',
+           '-f', 'image2pipe',
            '-pix_fmt', 'rgb24',
            '-vcodec', 'rawvideo', '-']
-
-    process =Popen(cmd, stdin=PIPE, stdout=PIPE, bufsize=10**7)
-    print('process pid=',process.pid)
-
-    timer = timerThread.Timer(stopFlag,resetComm, channels, 10)
+    process = Popen(cmd, stdin=PIPE, stdout=PIPE)
+    timer = timerThread.Timer(stopFlag,resetComm, channels, 20) #10
     timer.start()
     stopThread = Thread(target=userListener).start()
-    displayThread = Thread(target=displayImg).start()
-    startListen(channels.tcpSocketVideo2)
+
+    ax1 = plt.subplot(111)
+    plt.xticks([]), plt.yticks([])
+    animation = FuncAnimation(plt.gcf(), displayImg, interval=1) #10
+    plt.show()
 
     timer.join()
-    displayThread.join()
     process.kill()
-    f.close()
+    #f.close()
     closeComm()
     print('finished')
-    # this will stop the timer
 
 
 
