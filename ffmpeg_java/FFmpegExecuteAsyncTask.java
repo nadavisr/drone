@@ -108,15 +108,12 @@ public class FFmpegExecuteAsyncTask extends AsyncTask<Void, String, CommandResul
     {
         magicBytesCtrl = new byte[magicBytesCtrl_int.length];
         convertToByteArr(magicBytesCtrl_int, magicBytesCtrl);
-        //System.arraycopy(magicBytesCtrl_int, 0, magicBytesCtrl, 0, magicBytesCtrl.length);
 
         magicBytesVideo2 = new byte[magicBytesVideo2_int.length];
         convertToByteArr(magicBytesVideo2_int, magicBytesVideo2);
-        //System.arraycopy(magicBytesVideo2_int, 0, magicBytesVideo2, 0, magicBytesVideo2.length);
 
         udp_data = new byte[data_int.length];
         convertToByteArr(data_int, udp_data);
-        //System.arraycopy(data_int, 0, udp_data, 0, udp_data.length);
 
         magicBytesVideo1 = new byte[2][];
         magicBytesVideo1[0] = new byte[magicBytesVideo1_int[0].length];
@@ -124,10 +121,6 @@ public class FFmpegExecuteAsyncTask extends AsyncTask<Void, String, CommandResul
 
         magicBytesVideo1[1] = new byte[magicBytesVideo1_int[1].length];
         convertToByteArr(magicBytesVideo1_int[1], magicBytesVideo1[1]);
-
-        //System.arraycopy(magicBytesVideo1_int[0], 0, magicBytesVideo1[0], 0, magicBytesVideo1[0].length);
-        //System.arraycopy(magicBytesVideo1_int[1], 0, magicBytesVideo1[1], 0, magicBytesVideo1[1].length);
-
 
     }
 
@@ -146,15 +139,16 @@ public class FFmpegExecuteAsyncTask extends AsyncTask<Void, String, CommandResul
     {
         Log.i("Drone","on init" );
         initData();
-        displayVideo();
         receiveFromDrone();
+        displayVideo();
+
         timer = new Timer();
         timer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
                 resetFlag = true;
             }
-        }, 20*1000, 20*1000);
+        }, 10*1000, 10*1000);
     }
     //private
 
@@ -206,9 +200,11 @@ public class FFmpegExecuteAsyncTask extends AsyncTask<Void, String, CommandResul
             ctrlOutputStream = new DataOutputStream(tcpSocketCtrl.getOutputStream());
 
             tcpSocketVideo1 = new Socket(DRONE_IP, TCP_PORT);
+            tcpSocketVideo1.setSoTimeout(500);
             video1OutputStream = new DataOutputStream(tcpSocketVideo1.getOutputStream());
 
             tcpSocketVideo2 = new Socket(DRONE_IP, TCP_PORT);
+            tcpSocketVideo2.setSoTimeout(500);
             video2OutputStream = new DataOutputStream(tcpSocketVideo2.getOutputStream());
             video2InputStream = new DataInputStream(tcpSocketVideo2.getInputStream());
         }catch (Exception e)
@@ -226,16 +222,15 @@ public class FFmpegExecuteAsyncTask extends AsyncTask<Void, String, CommandResul
     private void sendMagicPacket1() throws java.io.IOException, java.lang.InterruptedException
     {
         video1OutputStream.write(magicBytesVideo1[0]);
-        Thread.sleep(1);
+        Thread.sleep(10);
         video1OutputStream.write(magicBytesVideo1[1]);
-        Thread.sleep(1);
+        Thread.sleep(10);
         Log.i("Drone","sendMagicPacket1" );
     }
 
     private void sendMagicPacket2() throws java.io.IOException, java.lang.InterruptedException
     {
         video2OutputStream.write(magicBytesVideo2);
-        Thread.sleep(1);
         Log.i("Drone","sendMagicPacket2" );
     }
 
@@ -274,8 +269,9 @@ public class FFmpegExecuteAsyncTask extends AsyncTask<Void, String, CommandResul
     private void resetComm() throws java.io.IOException, java.lang.InterruptedException
     {
         closeComm();
-        Thread.sleep(1);
+        Thread.sleep(100);
         initComm();
+        Thread.sleep(100);
         sendAllPackets();
         resetFlag = false;
 
@@ -311,7 +307,7 @@ public class FFmpegExecuteAsyncTask extends AsyncTask<Void, String, CommandResul
                                              continue;
 
                                          stdin.write(buffer, 0, bytesRead);
-                                         Log.i("Drone","write " + bytesRead + "to stdin");
+                                         Log.i("Drone","receiveFromDrone write " + bytesRead + "to stdin");
                                      } else
                                          Thread.sleep(10);
                                  } catch (Exception e) {
@@ -354,7 +350,7 @@ public class FFmpegExecuteAsyncTask extends AsyncTask<Void, String, CommandResul
                             while ((bytesRead = stdout.read(buffer, totalRead, imgSize-totalRead)) != -1) {
                                 totalRead += bytesRead;
 
-                                Log.i("Drone","bytesRead="+bytesRead);
+                                Log.i("Drone","displayVideo bytesRead="+bytesRead);
                                 if (totalRead == imgSize) {
                                     Log.i("Drone","frame ready");
                                     imageProvider.frameReady(buffer, WIDTH, HEIGHT);
